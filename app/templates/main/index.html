@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Inicio — Simulador Cobroventa{% endblock %}
+
+{% block content %}
+  <div class="p-4 bg-light rounded-3">
+    <h1 class="display-6">Simulador de venta y cobro</h1>
+    <p class="lead">
+      Catálogo de productos, pedidos con control de stock y cobros simulados
+      (tarjeta, efectivo y transferencia) sin pasar por una pasarela real.
+    </p>
+    <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Crear cuenta</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auth.login') }}">Entrar</a>
+  </div>
+
+  <div class="row g-4 mt-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">1. Catálogo</h5>
+          <p class="card-text">Alta de productos con SKU, precio y stock inicial.</p>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('products.list_products') }}">Ver productos</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">2. Pedidos</h5>
+          <p class="card-text">Creación de pedidos que descuentan stock y congelan el precio.</p>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('orders.list_orders') }}">Ver pedidos</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">3. Cobros</h5>
+          <p class="card-text">Pagos simulados con aprobación o rechazo según el método.</p>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('payments.panel') }}">Ver cobros</a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

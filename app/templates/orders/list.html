@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_macros.html" import order_status, money %}
+{% block title %}Pedidos — Simulador Cobroventa{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">
+      {% if current_user.is_admin %}Todos los pedidos{% else %}Mis pedidos{% endif %}
+    </h1>
+    <a class="btn btn-primary" href="{{ url_for('orders.create') }}">Nuevo pedido</a>
+  </div>
+
+  {% if orders %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Producto / Referencia</th>
+            {% if current_user.is_admin %}<th>Cliente</th>{% endif %}
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th class="text-end">Unidades</th>
+            <th class="text-end">Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+            <tr>
+              <td>
+                {% for item in order.items %}
+                  {{ item.product.name }}{% if not loop.last %},{% endif %}
+                {% else %}
+                  <span class="text-muted">Sin productos</span>
+                {% endfor %}
+                <span class="d-block text-muted small">{{ order.reference }}</span>
+              </td>
+              {% if current_user.is_admin %}<td>{{ order.user.name }}</td>{% endif %}
+              <td>{{ order.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+              <td>{{ order_status(order.status) }}</td>
+              <td class="text-end">{{ order.item_count }}</td>
+              <td class="text-end">{{ money(order.total) }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('orders.detail', order_id=order.id) }}">Ver</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted">Aún no hay pedidos.</p>
+  {% endif %}
+{% endblock %}

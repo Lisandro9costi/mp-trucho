@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_field %}
+{% block title %}{{ "Editar" if product else "Nuevo" }} producto{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h1 class="h4 mb-3">{{ "Editar producto" if product else "Nuevo producto" }}</h1>
+          <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            {{ render_field(form.sku) }}
+            {{ render_field(form.name) }}
+            {{ render_field(form.description) }}
+            {{ render_field(form.price) }}
+            {{ render_field(form.stock) }}
+            {{ render_field(form.active) }}
+            <button class="btn btn-primary" type="submit">Guardar</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('products.list_products') }}">Cancelar</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

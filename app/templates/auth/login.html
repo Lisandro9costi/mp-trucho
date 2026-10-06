@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_field %}
+{% block title %}Entrar — Simulador Cobroventa{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card">
+        <div class="card-body">
+          <h1 class="h4 mb-3">Iniciar sesión</h1>
+          <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            {{ render_field(form.email) }}
+            {{ render_field(form.password) }}
+            {{ render_field(form.remember) }}
+            {{ form.submit(class="btn btn-primary w-100") }}
+          </form>
+          <hr>
+          <p class="mb-0 text-center">
+            ¿No tienes cuenta? <a href="{{ url_for('auth.register') }}">Regístrate</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

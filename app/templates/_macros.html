@@ -1,0 +1,45 @@
+{# Macros reutilizables en todas las plantillas. #}
+
+{% macro render_field(field, cols="") %}
+  <div class="mb-3 {{ cols }}">
+    {{ field.label(class="form-label") }}
+    {% if field.type == "BooleanField" %}
+      <div class="form-check">{{ field(class="form-check-input") }}</div>
+    {% elif field.type == "TextAreaField" %}
+      {{ field(class="form-control", rows="3") }}
+    {% else %}
+      {{ field(class="form-control") }}
+    {% endif %}
+    {% if field.errors %}
+      <ul class="text-danger small mt-1 mb-0">
+        {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+
+{% macro order_status(status) %}
+  {% set classes = {
+    "pendiente": "secondary",
+    "pagado": "success",
+    "enviado": "primary",
+    "cancelado": "dark",
+  } %}
+  <span class="badge bg-{{ classes.get(status, 'light') }}">{{ status }}</span>
+{% endmacro %}
+
+
+{% macro payment_status(status) %}
+  {% set classes = {
+    "pendiente": "secondary",
+    "aprobado": "success",
+    "rechazado": "danger",
+  } %}
+  <span class="badge bg-{{ classes.get(status, 'light') }}">{{ status }}</span>
+{% endmacro %}
+
+
+{% macro money(value) -%}
+  {{ "%.2f"|format(value|float) }} €
+{%- endmacro %}

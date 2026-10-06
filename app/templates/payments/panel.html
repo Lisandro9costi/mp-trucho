@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import payment_status, money %}
+{% block title %}Cobros — Simulador Cobroventa{% endblock %}
+
+{% block content %}
+  <h1 class="h3 mb-3">
+    {% if current_user.is_admin %}Todos los cobros{% else %}Mis cobros{% endif %}
+  </h1>
+
+  {% if payments %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Producto / Referencia</th>
+            <th>Cobro</th>
+            <th>Método</th>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th class="text-end">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+            <tr>
+              <td>
+                {% for item in payment.order.items %}
+                  {{ item.product.name }}{% if not loop.last %},{% endif %}
+                {% else %}
+                  <span class="text-muted">Sin productos</span>
+                {% endfor %}
+                <a class="d-block text-muted small"
+                   href="{{ url_for('orders.detail', order_id=payment.order_id) }}">
+                  {{ payment.order.reference }}
+                </a>
+              </td>
+              <td>{{ payment.reference }}</td>
+              <td>{{ payment.method }}</td>
+              <td>{{ payment.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+              <td>{{ payment_status(payment.status) }}</td>
+              <td class="text-end">{{ money(payment.amount) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted">Todavía no hay cobros registrados.</p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_field, order_status, money %}
+{% block title %}Panel — Simulador Cobroventa{% endblock %}
+
+{% block content %}
+  <h1 class="mb-4">Panel de {{ current_user.name }}</h1>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card text-center">
+        <div class="card-body">
+          <h6 class="card-subtitle text-muted">Pedidos</h6>
+          <p class="display-6 mb-0">{{ orders|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center">
+        <div class="card-body">
+          <h6 class="card-subtitle text-muted">Cobros</h6>
+          <p class="display-6 mb-0">{{ payments|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center">
+        <div class="card-body">
+          <h6 class="card-subtitle text-muted">Total cobrado</h6>
+          <p class="display-6 mb-0">{{ money(cobrado) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if current_user.is_admin %}
+    <a class="btn btn-primary mb-3" href="{{ url_for('products.create') }}">Nuevo producto</a>
+  {% endif %}
+
+  <h2 class="h4">Últimos pedidos</h2>
+  {% if orders %}
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Producto / Referencia</th>
+          {% if current_user.is_admin %}<th>Cliente</th>{% endif %}
+          <th>Estado</th>
+          <th class="text-end">Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders[:10] %}
+          <tr>
+            <td>
+              {% for item in order.items %}
+                {{ item.product.name }}{% if not loop.last %},{% endif %}
+              {% else %}
+                <span class="text-muted">Sin productos</span>
+              {% endfor %}
+              <span class="d-block text-muted small">{{ order.reference }}</span>
+            </td>
+            {% if current_user.is_admin %}<td>{{ order.user.name }}</td>{% endif %}
+            <td>{{ order_status(order.status) }}</td>
+            <td class="text-end">{{ money(order.total) }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('orders.detail', order_id=order.id) }}">Ver</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="text-muted">
+      Todavía no hay pedidos.
+      <a href="{{ url_for('orders.create') }}">Crea el primero</a>.
+    </p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Error del servidor{% endblock %}
+
+{% block content %}
+  <div class="text-center py-5">
+    <h1 class="display-1">500</h1>
+    <p class="lead">Algo falló por nuestro lado. Inténtalo de nuevo.</p>
+    <a class="btn btn-primary" href="{{ url_for('main.index') }}">Volver al inicio</a>
+  </div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros.html" import money %}
+{% block title %}Productos — Simulador Cobroventa{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Catálogo</h1>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+      <a class="btn btn-primary" href="{{ url_for('products.create') }}">Nuevo producto</a>
+    {% endif %}
+  </div>
+
+  <form class="row g-2 mb-4" method="get">
+    <div class="col-md-8">
+      <input
+        class="form-control"
+        type="search"
+        name="q"
+        value="{{ q }}"
+        placeholder="Buscar por nombre o SKU"
+      >
+    </div>
+    <div class="col-md-4">
+      <button class="btn btn-outline-secondary w-100" type="submit">Buscar</button>
+    </div>
+  </form>
+
+  {% if products %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Nombre</th>
+            <th class="text-end">Precio</th>
+            <th class="text-end">Stock</th>
+            {% if current_user.is_authenticated and current_user.is_admin %}<th></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+            <tr>
+              <td><code>{{ product.sku }}</code></td>
+              <td>
+                {{ product.name }}
+                {% if not product.active %}
+                  <span class="badge bg-dark ms-1">inactivo</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ money(product.price) }}</td>
+              <td class="text-end">{{ product.stock }}</td>
+              {% if current_user.is_authenticated and current_user.is_admin %}
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('products.edit', product_id=product.id) }}">Editar</a>
+                  {% if product.active %}
+                    <form class="d-inline" method="post" action="{{ url_for('products.deactivate', product_id=product.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Dar de baja</button>
+                    </form>
+                  {% endif %}
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted">No hay productos que coincidan con la búsqueda.</p>
+  {% endif %}
+{% endblock %}
