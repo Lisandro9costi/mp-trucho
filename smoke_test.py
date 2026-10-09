@@ -13,6 +13,7 @@ import tempfile
 from config import Config
 from app import create_app, db
 from app.models import Order, OrderItem, Payment, Product, User
+from app.services import mercado_pago as mp
 
 # WTForms puede intercalar atributos (por ejemplo type="hidden") entre el
 # name y el value, así que el patrón admite cualquier cosa en medio.
@@ -30,6 +31,10 @@ class SmokeConfig(Config):
     )
     WTF_CSRF_ENABLED = True
     TESTING = True
+    # Sin credenciales reales: los tests usan el simulador y la API se
+    # parchea, así que el .env del entorno no debe filtrarse.
+    MP_ACCESS_TOKEN = ""
+    MP_NOTIFICATION_URL = ""
 
 
 def _csrf(client, url):
@@ -340,6 +345,171 @@ def main():
         estado3 = db.session.get(Order, order3_id).status
     check("cancelación devuelve el stock", stock_despues == stock_antes + 1)
     check("pedido cancelado", estado3 == "cancelado")
+
+    # --- Integración con Checkout Pro de Mercado Pago (API simulada) ---
+    # Sin credenciales el webhook responde 200 aunque no consulte nada, así
+    # que Mercado Pago no reenvía la notificación sin parar.
+    resp = client.get("/pagos/webhook?topic=payment&id=1")
+    check("webhook sin credenciales responde 200", resp.status_code == 200)
+
+    # La referencia del cobro solo se conoce después de crear el pago, así
+    # que las respuestas simuladas la leen de este contenedor mutable.
+    conocido = {"reference": "", "preference": None}
+
+    def fake_request(method, path, payload=None):
+        """Sustituye la llamada HTTP a Mercado Pago por respuestas fijas."""
+        if "preferences" in path:
+            conocido["preference"] = payload
+            return 201, {
+                "id": "pref-1",
+                "init_point": "https://mp.test/checkout/pref-1",
+            }
+        if "search" in path:
+            return 200, {
+                "results": [
+                    {
+                        "id": 424242,
+                        "status": "approved",
+                        "status_detail": "accredited",
+                        "payment_method_id": "visa",
+                        "external_reference": conocido["reference"],
+                    }
+                ]
+            }
+        # GET /v1/payments/{id}: el pago remoto figura como pendiente.
+        return 200, {
+            "id": path.rsplit("/", 1)[-1],
+            "status": "pending",
+            "status_detail": "pending_cont",
+            "payment_method_id": "visa",
+            "external_reference": conocido["reference"],
+        }
+
+    def failing_request(method, path, payload=None):
+        """Simula un error 400 devuelto por la API."""
+        raise mp.MercadoPagoError(
+            "Mercado Pago respondió 400: preferencia inválida", status_code=400
+        )
+
+    # Pedido propio del cliente para pagar por Mercado Pago.
+    client.post(
+        "/pedidos/nuevo",
+        data={
+            "csrf_token": _csrf(client, "/pedidos/nuevo"),
+            "product_id": str(product_id),
+            "quantity": "1",
+            "notes": "Pedido para Mercado Pago",
+        },
+    )
+    with app.app_context():
+        pedido_mp = db.session.scalar(
+            db.select(Order).where(Order.notes == "Pedido para Mercado Pago")
+        )
+        order_mp_id = pedido_mp.id
+
+    original_request = mp._request
+    mp._request = fake_request
+    app.config["MP_ACCESS_TOKEN"] = "APP_USR-TEST-00000000000"
+    try:
+        # El botón "Pagar con Mercado Pago" crea la preferencia y redirige.
+        resp = client.post(
+            f"/pagos/pedido/{order_mp_id}",
+            data={
+                "csrf_token": _csrf(client, f"/pagos/pedido/{order_mp_id}"),
+                "amount": "12.34",
+                "method": "tarjeta",
+                "go_mp": "1",
+            },
+        )
+        check(
+            "el botón MP redirige al checkout",
+            resp.status_code == 302
+            and resp.headers["Location"].startswith("https://mp.test/"),
+        )
+        excluidos = {
+            tipo["id"]
+            for tipo in conocido["preference"]["payment_methods"][
+                "excluded_payment_types"
+            ]
+        }
+        check(
+            "el checkout excluye tarjetas y efectivo",
+            {"credit_card", "debit_card", "ticket"} <= excluidos,
+        )
+        check("el checkout no excluye la transferencia", "bank_transfer" not in excluidos)
+        with app.app_context():
+            pago_mp = db.session.scalar(
+                db.select(Payment)
+                .where(Payment.order_id == order_mp_id)
+                .order_by(Payment.id)
+            )
+            pago_mp_id = pago_mp.id
+            check("el cobro MP nace pendiente", pago_mp.status == "pendiente")
+            check("el método queda marcado como mercadopago", pago_mp.method == "mercadopago")
+            conocido["reference"] = pago_mp.reference
+
+        # El retorno del comprador sincroniza el cobro (búsqueda por referencia).
+        resp = client.get(
+            f"/pagos/retorno?external_reference={conocido['reference']}&payment_id=424242"
+        )
+        with app.app_context():
+            pago_mp = db.session.get(Payment, pago_mp_id)
+            estado_mp = db.session.get(Order, order_mp_id).status
+            check("el retorno aprueba el cobro", pago_mp.status == "aprobado")
+            check("guarda el id de Mercado Pago", pago_mp.mp_id == "424242")
+            check("el pedido queda pagado por MP", estado_mp == "pagado")
+
+        # El webhook aplica el estado remoto (aquí, de vuelta a pendiente).
+        resp = client.get("/pagos/webhook?topic=payment&id=424242")
+        check("webhook MP responde 200", resp.status_code == 200)
+        with app.app_context():
+            estado_webhook = db.session.get(Payment, pago_mp_id).status
+            estado_pedido = db.session.get(Order, order_mp_id).status
+        check("webhook deja el cobro pendiente", estado_webhook == "pendiente")
+        check("el pedido vuelve a pendiente", estado_pedido == "pendiente")
+
+        # La vista de detalle ofrece el botón de sincronización manual.
+        detalle = client.get(f"/pedidos/{order_mp_id}").get_data(as_text=True)
+        check(
+            "el detalle ofrece sincronizar con Mercado Pago",
+            "Sincronizar" in detalle and "MP 424242" in detalle,
+        )
+
+        # Sincronización manual (necesaria en local, sin back_urls alcanzables).
+        resp = client.post(
+            f"/pagos/{pago_mp_id}/actualizar",
+            data={"csrf_token": _csrf(client, "/pagos/")},
+            follow_redirects=True,
+        )
+        check(
+            "sincronización manual responde",
+            resp.status_code == 200 and "pendiente" in resp.get_data(as_text=True),
+        )
+
+        # Un error de la API no deja cobro y se comunica al usuario.
+        mp._request = failing_request
+        resp = client.post(
+            f"/pagos/pedido/{order_mp_id}",
+            data={
+                "csrf_token": _csrf(client, f"/pagos/pedido/{order_mp_id}"),
+                "amount": "12.34",
+                "method": "tarjeta",
+                "go_mp": "1",
+            },
+            follow_redirects=True,
+        )
+        with app.app_context():
+            cobros_mp = db.session.scalars(
+                db.select(Payment).where(Payment.order_id == order_mp_id)
+            ).all()
+        check(
+            "error de la API no crea cobro",
+            len(cobros_mp) == 1
+            and "preferencia inválida" in resp.get_data(as_text=True),
+        )
+    finally:
+        mp._request = original_request
+        app.config["MP_ACCESS_TOKEN"] = ""
 
     client.get("/auth/logout")
     _login(client, "admin@example.com", "admin123")

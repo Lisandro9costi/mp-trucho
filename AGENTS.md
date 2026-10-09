@@ -28,6 +28,39 @@ tarea, ejecuta `smoke_test.py` y `smoke_http.py`.
 Si añades un blueprint: créalo en `app/routes/`, regístralo dentro de
 `create_app()` y crea `app/templates/<nombre>/` con sus plantillas.
 
+## Mercado Pago (Checkout Pro)
+
+- Cliente: `app/services/mercado_pago.py` (`create_preference`,
+  `get_payment`, `find_payment`, `map_status`, `is_configured`, excepción
+  `MercadoPagoError`). Usa `urllib` de la stdlib, sin dependencias nuevas.
+- Configuración en `config.py` desde variables de entorno:
+  `MP_ACCESS_TOKEN`, `MP_API_URL`, `MP_TIMEOUT`, `MP_BASE_URL`,
+  `MP_NOTIFICATION_URL`, `MP_CURRENCY`. Sin access token manda el
+  simulador local.
+- El checkout queda limitado a transferencia: `create_preference` excluye
+  los tipos de `EXCLUDED_PAYMENT_TYPES` (tarjetas, efectivo, etc.). El
+  saldo en cuenta (`account_money`) no es excluible; Mercado Pago lo
+  muestra siempre.
+- `config.py` carga el archivo `.env` de la raíz con `python-dotenv`
+  (`load_dotenv`), así que las credenciales no viven en el repositorio.
+  La plantilla versionada es `.env.example`.
+- El botón `go_mp` de `payments.pay` solo crea la preferencia si hay
+  credenciales; en cualquier otro caso usa `payments._simulate()`.
+- `payments.webhook` está exento de CSRF (`@csrf.exempt`) y de login:
+  Mercado Pago debe poder llamarlo sin sesión. Siempre responde 2xx salvo
+  fallo de la API, que devuelve 500 para que MP reintente.
+- `payments.retorno` (back_urls) y `payments.refresh` comparten
+  `payments._sync_payment`, que consulta la API por `mp_id` o, si aún no
+  se conoce, por `external_reference` (`find_payment`).
+- `payments._apply_remote()` es el único sitio que traduce estados
+  remotos a locales y ajusta el estado del pedido.
+- Cobros de la API: `Payment.mp_id`, `Payment.mp_method` y
+  `Payment.status_detail`. `app/__init__.py:ensure_columns()` añade esas
+  columnas a un SQLite ya existente (`db.create_all()` no altera tablas).
+- `_base_url()` usa `MP_BASE_URL` para las `back_urls`; en local apunta a
+  `127.0.0.1` y Mercado Pago las descarta (exige https), por eso existe
+  el botón "Sincronizar".
+
 ## Convenciones
 
 - Identificadores en inglés, docstrings y comentarios en español.
@@ -67,7 +100,11 @@ Si añades un blueprint: créalo en `app/routes/`, regístralo dentro de
 - En `payments.pay` el importe se propone solo si el formulario no viene
   enviado (`if not form.is_submitted()`); si no, se sobrescribe lo que
   escribió el usuario.
-- La regla de rechazo con tarjeta vive en `payments._simulate()`.
+- La regla de rechazo con tarjeta vive en `payments._simulate()` (solo
+  se usa sin credenciales de Mercado Pago).
+- Los cobros de Mercado Pago se marcan con `method == "mercadopago"`;
+  el botón "Sincronizar" de las plantillas se muestra con ese valor y
+  `status == "pendiente"`.
 
 ## Pruebas
 

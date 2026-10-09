@@ -35,6 +35,9 @@ class HttpSmokeConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(
         tempfile.gettempdir(), "simulador_smoke_http.db"
     )
+    # Sin credenciales reales: el .env del entorno no debe filtrarse.
+    MP_ACCESS_TOKEN = ""
+    MP_NOTIFICATION_URL = ""
 
 
 def _opener():
@@ -205,6 +208,14 @@ def main():
         check("logout redirige (302)", status == 302)
         status, _ = request(opener, "/panel")
         check("tras salir, el panel redirige", status == 302)
+
+        # --- Webhook de Mercado Pago (público y exento de CSRF) ---
+        status, _ = request(opener, "/pagos/webhook?topic=payment&id=1")
+        check("webhook MP responde 200 sin sesión", status == 200)
+        status, _ = request(
+            opener, "/pagos/webhook?type=payment&id=1", {"dummy": "1"}
+        )
+        check("webhook MP acepta POST sin CSRF (exento)", status == 200)
 
         # --- 404 ---
         status, html = request(opener, "/no-existe")

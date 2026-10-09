@@ -34,10 +34,32 @@
                   {{ payment.order.reference }}
                 </a>
               </td>
-              <td>{{ payment.reference }}</td>
+              <td>
+                {{ payment.reference }}
+                {% if payment.mp_id %}
+                  <small class="d-block text-muted">
+                    MP {{ payment.mp_id }}{% if payment.mp_method %} · {{ payment.mp_method }}{% endif %}
+                  </small>
+                {% endif %}
+              </td>
               <td>{{ payment.method }}</td>
               <td>{{ payment.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
-              <td>{{ payment_status(payment.status) }}</td>
+              <td>
+                {{ payment_status(payment.status) }}
+                {% if payment.status_detail %}
+                  <small class="d-block text-muted">{{ payment.status_detail }}</small>
+                {% endif %}
+                {% if payment.method == "mercadopago" and payment.status == "pendiente" %}
+                  <form method="post"
+                        action="{{ url_for('payments.refresh', payment_id=payment.id) }}"
+                        class="mt-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">
+                      Sincronizar
+                    </button>
+                  </form>
+                {% endif %}
+              </td>
               <td class="text-end">{{ money(payment.amount) }}</td>
             </tr>
           {% endfor %}

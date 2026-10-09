@@ -17,12 +17,27 @@
             {{ render_field(form.amount) }}
             {{ render_field(form.method) }}
             {{ form.submit(class="btn btn-success w-100") }}
+            {% if mp_configured %}
+              <button class="btn btn-primary w-100 mt-2" type="submit"
+                      name="go_mp" value="1">
+                Pagar con Mercado Pago
+              </button>
+            {% endif %}
           </form>
           <hr>
-          <p class="small text-muted mb-0">
-            Simulación: el efectivo y la transferencia siempre se aprueban;
-            la tarjeta se rechaza cuando el importe termina en 0.
-          </p>
+          {% if mp_configured %}
+            <p class="small text-muted mb-0">
+              "Pagar con Mercado Pago" redirige al checkout de Mercado Pago
+              (solo transferencia). El botón "Cobrar" resuelve el cobro
+              localmente con el simulador.
+            </p>
+          {% else %}
+            <p class="small text-muted mb-0">
+              Simulación: el efectivo y la transferencia siempre se aprueban;
+              la tarjeta se rechaza cuando el importe termina en 0. Definí
+              <code>MP_ACCESS_TOKEN</code> para habilitar Mercado Pago.
+            </p>
+          {% endif %}
         </div>
       </div>
     </div>

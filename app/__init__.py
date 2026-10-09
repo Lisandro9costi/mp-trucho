@@ -57,9 +57,11 @@ def create_app(config_class=Config):
     # Importa los modelos para que SQLAlchemy conozca las tablas.
     from app import models  # noqa: F401
 
-    # Crea las tablas si todavía no existen.
+    # Crea las tablas que falten y añade las columnas nuevas a las ya
+    # existentes (db.create_all() no altera tablas creadas).
     with app.app_context():
         db.create_all()
+        ensure_columns()
 
     @app.context_processor
     def inject_year():
@@ -67,6 +69,12 @@ def create_app(config_class=Config):
         from datetime import datetime
 
         return {"year": datetime.now().year}
+
+    @app.context_processor
+    def inject_mercado_pago():
+        """Inyecta si Mercado Pago está configurado (para mostrar su botón)."""
+        token = str(app.config.get("MP_ACCESS_TOKEN", "")).strip()
+        return {"mp_configured": bool(token)}
 
     @app.errorhandler(404)
     def page_not_found(error):
@@ -85,6 +93,34 @@ def create_app(config_class=Config):
         return render_template("errors/500.html"), 500
 
     return app
+
+
+def ensure_columns():
+    """Añade a las tablas ya existentes las columnas nuevas que falten.
+
+    ``db.create_all()`` no altera tablas creadas y SQLite no ofrece
+    ``ADD COLUMN IF NOT EXISTS``, así que se comprueba columna a columna
+    la tabla de cobros antes de emitir el ``ALTER TABLE``. Solo se añaden
+    columnas: nunca se modifican ni se eliminan datos existentes.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    if "payments" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("payments")}
+    additions = (
+        ("mp_id", "VARCHAR(30)"),
+        ("mp_method", "VARCHAR(30) NOT NULL DEFAULT ''"),
+        ("status_detail", "VARCHAR(40) NOT NULL DEFAULT ''"),
+    )
+    with db.engine.begin() as connection:
+        for name, ddl in additions:
+            if name not in existing:
+                connection.execute(
+                    text(f"ALTER TABLE payments ADD COLUMN {name} {ddl}")
+                )
 
 
 @login_manager.user_loader

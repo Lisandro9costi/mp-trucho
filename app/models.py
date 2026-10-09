@@ -223,6 +223,14 @@ class Payment(db.Model):
     method = db.Column(db.String(20), nullable=False, default="tarjeta")
     status = db.Column(db.String(20), nullable=False, default="pendiente", index=True)
     reference = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    # Identificador del pago en Mercado Pago (vacío en el simulador local).
+    mp_id = db.Column(db.String(30), nullable=True, index=True)
+    # Medio de pago detectado por la API (visa, master, efectivo...).
+    mp_method = db.Column(db.String(30), nullable=False, default="")
+    # Motivo del resultado según la API (accredited, cc_rejected_...).
+    status_detail = db.Column(
+        db.String(40), nullable=False, default="", server_default=""
+    )
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
     order = db.relationship("Order", back_populates="payments")
